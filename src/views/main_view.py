@@ -5,13 +5,13 @@ from src.config.settings import DATABASE_URL
 from src.services.product_service import ProductService
 from src.services.sale_service import SaleService
 
-# Importação das Páginas Modulares
+# Importação das Páginas
 from src.views.pages.inventory_page import InventoryPage
 from src.views.pages.pos_page import PosPage
 from src.views.pages.dashboard_page import DashboardPage
 
 def main(page: ft.Page):
-    # --- Configuração da Janela ---
+    # Configuração da Janela
     page.title = "PyPOS | Enterprise"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.window_min_width = 1200
@@ -19,41 +19,45 @@ def main(page: ft.Page):
     page.padding = 0
     page.bgcolor = "#f3f4f6"
     
-    # Fonte padrão bonita
     page.fonts = {"Roboto": "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Regular.ttf"}
     page.theme = ft.Theme(font_family="Roboto")
 
     # --- Backend ---
     try:
         engine = create_engine(DATABASE_URL)
+        
+        # Cria tabelas se não existirem
+        from src.models.base import Base
+        from src.models.product import Product 
+        from src.models.sale import Sale
+        Base.metadata.create_all(engine) 
+
         session = Session(engine)
         product_service = ProductService(session)
         sale_service = SaleService(session)
+        print("✅ Backend inicializado e pronto.")
     except Exception as e:
-        print(f"Erro Crítico de Banco: {e}")
+        print(f"❌ Erro Crítico de Banco: {e}")
         return
 
-    # --- Instancia as Páginas ---
+    # --- Instancia Páginas ---
     inventory_page = InventoryPage(page, product_service)
     pos_page = PosPage(page, product_service, sale_service)
-    dashboard_page = DashboardPage(page)
+    dashboard_page = DashboardPage(page, product_service, sale_service)
 
-    # Área de Conteúdo (Dinâmica)
     content_area = ft.Container(content=inventory_page, expand=True)
 
     def navegar(e):
         page_id = e.control.data
-        
         if page_id == "estoque":
             content_area.content = inventory_page
-            inventory_page.carregar_dados() # Atualiza tabela ao entrar
+            inventory_page.carregar_dados()
         elif page_id == "caixa":
             content_area.content = pos_page
-            # Opcional: focar no input ao entrar
-            pos_page.txt_codigo.focus()
         elif page_id == "dashboard":
             content_area.content = dashboard_page
-            # Futuro: dashboard_page.atualizar_dados()
+            # NÃO chame dashboard_page.atualizar_dados() aqui!
+            # O did_mount() que criamos no dashboard resolve isso sozinho.
             
         content_area.update()
 
@@ -63,14 +67,15 @@ def main(page: ft.Page):
                 ft.Icon(icon, color=ft.Colors.WHITE70, size=20),
                 ft.Text(text, color=ft.Colors.WHITE, size=14, weight="w500")
             ], spacing=15),
-            padding=ft.padding.symmetric(vertical=12, horizontal=15),
+            # CORREÇÃO DEPRECATION: Usando apenas padding=15 (mais simples e compatível)
+            padding=15,
             border_radius=8,
             ink=True,
             on_click=navegar if not is_logout else lambda _: page.window_close(),
             data=data_id
         )
 
-    # --- Sidebar ---
+    # Sidebar
     sidebar = ft.Container(
         width=260,
         bgcolor="#111827",
@@ -79,7 +84,7 @@ def main(page: ft.Page):
             ft.Row([
                 ft.Icon(ft.Icons.ROCKET_LAUNCH, color=ft.Colors.BLUE_400, size=28),
                 ft.Text("PyPOS", color=ft.Colors.WHITE, size=22, weight="bold")
-            ], alignment="center"),
+            ], alignment=ft.MainAxisAlignment.CENTER),
             
             ft.Divider(color=ft.Colors.WHITE10, height=30),
             
@@ -100,4 +105,5 @@ def main(page: ft.Page):
     page.add(layout)
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    # Correção do deprecated app
+    ft.app(main)

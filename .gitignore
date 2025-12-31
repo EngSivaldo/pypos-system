@@ -7,3 +7,8 @@ __pycache__/
 *.log
 .vscode/
 alembic.ini  # (Opcional: Se tiver senhas reais. No nosso caso é sqlite local, pode deixar, mas em prod tiramos)
+
+# Cria o arquivo .gitignore ignorando o cupom e o banco de dados local
+echo "cupom_fiscal.txt" >> .gitignore
+echo "*.db" >> .gitignore
+echo "__pycache__/" >> .gitignore
