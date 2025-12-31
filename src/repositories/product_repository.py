@@ -1,7 +1,6 @@
-# Implementação do padrão Repository para Produtos.
-# Aqui vão os métodos: add, get_by_code, update_stock, etc.
 from typing import List, Optional
-from sqlalchemy import select, update
+# IMPORTANTE: Adicionei 'delete' aqui no topo para não importar dentro da função
+from sqlalchemy import select, update, delete
 from sqlalchemy.orm import Session
 from src.models.product import Product
 
@@ -25,10 +24,7 @@ class ProductRepository:
 
     def get_by_barcode(self, barcode: str) -> Optional[Product]:
         """Busca um produto exato pelo código de barras."""
-        # SQLAlchemy 2.0: select(Modelo).where(Condição)
         stmt = select(Product).where(Product.barcode == barcode)
-        
-        # scalars().first() retorna o objeto puro ou None
         return self.session.execute(stmt).scalars().first()
 
     def get_all(self) -> List[Product]:
@@ -43,5 +39,26 @@ class ProductRepository:
             .where(Product.id == product_id)
             .values(stock_quantity=new_quantity)
         )
+        self.session.execute(stmt)
+        self.session.commit()
+
+    def update(self, product_id: int, name: str, price: float, stock: int) -> None:
+        """Atualiza os dados gerais de um produto existente."""
+        stmt = (
+            update(Product)
+            .where(Product.id == product_id)
+            .values(
+                name=name,
+                price=price,
+                stock_quantity=stock
+            )
+        )
+        self.session.execute(stmt)
+        self.session.commit()
+
+    def delete(self, product_id: int) -> None:
+        """Remove um produto do banco pelo ID."""
+        # O import foi movido para o topo do arquivo (Clean Code)
+        stmt = delete(Product).where(Product.id == product_id)
         self.session.execute(stmt)
         self.session.commit()

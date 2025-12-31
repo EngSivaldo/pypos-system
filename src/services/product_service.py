@@ -56,3 +56,34 @@ class ProductService:
 
     def list_products(self):
         return self.repository.get_all()
+    
+    
+
+
+    # ADICIONE ESTE NOVO MÉTODO NA CLASSE:
+    def update_product(self, product_id: int, name: str, price: str | float, stock: int):
+        """Atualiza um produto existente validando as regras."""
+        if not name or len(name.strip()) < 3:
+            raise ValueError("O nome do produto deve ter pelo menos 3 letras.")
+        
+        try:
+            price_decimal = Decimal(str(price))
+            if price_decimal <= 0:
+                raise ValueError("O preço deve ser maior que zero.")
+        except Exception:
+            raise ValueError("Preço inválido.")
+
+        # Chama o repositório para gravar
+        self.repository.update(product_id, name, price_decimal, stock)
+        
+        
+    def delete_product(self, product_id: int):
+        """Remove produto, tratando erros de vínculo (se já foi vendido)."""
+        try:
+            self.repository.delete(product_id)
+        except Exception as e:
+            # Rollback é automático na sessão, mas capturamos para mensagem amigável
+            self.repository.session.rollback()
+            if "foreign key" in str(e).lower():
+                raise ValueError("Não é possível deletar este produto pois ele já possui vendas registradas.")
+            raise e
