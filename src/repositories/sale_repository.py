@@ -1,0 +1,1 @@
+# Métodos para salvar vendas e itens de forma atômica.

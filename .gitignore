@@ -1,0 +1,9 @@
+# .gitignore
+__pycache__/
+*.py[cod]
+.venv/
+.env
+*.db
+*.log
+.vscode/
+alembic.ini  # (Opcional: Se tiver senhas reais. No nosso caso é sqlite local, pode deixar, mas em prod tiramos)
