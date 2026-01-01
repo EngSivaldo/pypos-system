@@ -9,6 +9,7 @@ from src.services.sale_service import SaleService
 from src.views.pages.inventory_page import InventoryPage
 from src.views.pages.pos_page import PosPage
 from src.views.pages.dashboard_page import DashboardPage
+from src.views.pages.history_page import HistoryPage
 
 def main(page: ft.Page):
     # Configuração da Janela
@@ -44,6 +45,7 @@ def main(page: ft.Page):
     inventory_page = InventoryPage(page, product_service)
     pos_page = PosPage(page, product_service, sale_service)
     dashboard_page = DashboardPage(page, product_service, sale_service)
+    history_page = HistoryPage(page, sale_service)
 
     content_area = ft.Container(content=inventory_page, expand=True)
 
@@ -58,7 +60,11 @@ def main(page: ft.Page):
             content_area.content = dashboard_page
             # NÃO chame dashboard_page.atualizar_dados() aqui!
             # O did_mount() que criamos no dashboard resolve isso sozinho.
-            
+        elif page_id == "historico":  # <--- NOVA CONDIÇÃO
+            content_area.content = history_page
+            # O did_mount resolve o carregamento, mas se quiser forçar:
+            # history_page.carregar_dados()
+                
         content_area.update()
 
     def menu_button(text, icon, data_id, is_logout=False):
@@ -93,6 +99,8 @@ def main(page: ft.Page):
             menu_button("Dashboard", ft.Icons.DASHBOARD_OUTLINED, "dashboard"),
             menu_button("Estoque", ft.Icons.INVENTORY_2_OUTLINED, "estoque"),
             menu_button("Vendas (PDV)", ft.Icons.POINT_OF_SALE, "caixa"),
+            # NOVO BOTÃO:
+            menu_button("Histórico", ft.Icons.HISTORY, "historico"),
             
             ft.Container(expand=True),
             

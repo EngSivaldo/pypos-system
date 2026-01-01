@@ -65,7 +65,7 @@ class SaleService:
             self.session.rollback()
             raise Exception(f"Erro ao salvar venda: {str(e)}")
         
-    # ... (métodos anteriores) ...
+
 
     def get_dashboard_stats(self):
         from sqlalchemy import func
@@ -91,3 +91,9 @@ class SaleService:
             "vendas_hoje": Decimal(str(sales_today)),
             "ticket_medio": Decimal(str(avg_ticket))
         }
+        
+        
+    def list_sales(self):
+        """Lista todas as vendas ordenadas por data (mais recente primeiro)"""
+        # O sale.items e sale.items.product serão carregados automaticamente pelo SQLAlchemy
+        return self.session.query(Sale).order_by(Sale.created_at.desc()).all()
