@@ -12,3 +12,13 @@ alembic.ini  # (Opcional: Se tiver senhas reais. No nosso caso é sqlite local, 
 echo "cupom_fiscal.txt" >> .gitignore
 echo "*.db" >> .gitignore
 echo "__pycache__/" >> .gitignore
+
+# Build artifacts
+build/
+dist/
+*.spec
+
+# Assets
+icone.icobuild/
+dist/
+*.spec
