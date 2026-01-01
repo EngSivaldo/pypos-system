@@ -5,11 +5,13 @@ from datetime import datetime
 import subprocess
 
 class PosPage(ft.Container):
-    def __init__(self, page, product_service, sale_service):
+    # CORREÇÃO AQUI: Adicionei settings_service nos parâmetros
+    def __init__(self, page, product_service, sale_service, settings_service):
         super().__init__()
         self.main_page = page
         self.product_service = product_service
         self.sale_service = sale_service
+        self.settings_service = settings_service # Agora essa linha vai funcionar
         self.expand = True
         self.padding = 20
         self.bgcolor = "#f3f4f6"
@@ -29,7 +31,7 @@ class PosPage(ft.Container):
             title=ft.Text("Editar Item"), 
             content=self.txt_edit_qtd,
             actions=[
-                ft.TextButton("Cancelar", on_click=self._fechar_modal_edit), # Botão dedicado para fechar este modal
+                ft.TextButton("Cancelar", on_click=self._fechar_modal_edit),
                 ft.FilledButton("Salvar", on_click=self._salvar_edicao_item)
             ]
         )
@@ -58,7 +60,7 @@ class PosPage(ft.Container):
                 ft.Container(self.txt_checkout_itens, alignment=ft.Alignment(0, 0)),
                 ft.Divider(height=20),
                 ft.Text("Opções:", size=12, weight="bold"),
-                ft.Container(self.switch_imprimir, alignment=ft.Alignment(0,0)), # Centraliza o switch
+                ft.Container(self.switch_imprimir, alignment=ft.Alignment(0,0)),
                 ft.Divider(height=10),
                 ft.Text("Forma de Pagamento:", size=12, weight="bold"),
                 opcoes_pagamento,
@@ -163,16 +165,22 @@ class PosPage(ft.Container):
             alignment=ft.Alignment(0, 0)
         )
 
-    # --- LÓGICA DE IMPRESSÃO (NOVO) ---
+    # --- LÓGICA DE IMPRESSÃO ---
     def _imprimir_cupom(self):
         filename = "cupom_fiscal.txt"
         try:
+            # BUSCA DADOS DA EMPRESA
+            config = self.settings_service.get_settings()
+            
             total = sum(i['prod'].price * i['qtd'] for i in self.carrinho)
             
             # 1. Gera o Arquivo
             with open(filename, "w", encoding="utf-8") as f:
                 f.write("="*32 + "\n")
-                f.write("      PYPOS ENTERPRISE      \n")
+                # CENTRALIZA O NOME DA EMPRESA
+                f.write(f"{config.company_name:^32}\n") 
+                if config.cnpj:
+                    f.write(f"{'CNPJ: ' + config.cnpj:^32}\n")
                 f.write("="*32 + "\n")
                 f.write(f"DATA: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
                 f.write("-" * 32 + "\n")
@@ -180,7 +188,6 @@ class PosPage(ft.Container):
                 f.write("-" * 32 + "\n")
                 
                 for item in self.carrinho:
-                    # Limita nome a 18 chars para não quebrar linha
                     nome = item['prod'].name[:18]
                     qtd = item['qtd']
                     valor = item['prod'].price * qtd
@@ -189,22 +196,17 @@ class PosPage(ft.Container):
                 f.write("-" * 32 + "\n")
                 f.write(f"TOTAL A PAGAR:      R$ {total:.2f}\n")
                 f.write("="*32 + "\n")
-                f.write("     OBRIGADO PELA PREFERENCIA    \n")
+                # MENSAGEM DO RODAPÉ CUSTOMIZADA
+                f.write(f"{config.receipt_footer:^32}\n")
                 f.write("="*32 + "\n\n\n") 
 
-            # 2. Tenta Imprimir via Bloco de Notas (Modo Silencioso)
-            # O flag '/p' manda imprimir na impressora padrão
             subprocess.run(["notepad", "/p", filename], shell=True)
             
         except Exception as e:
-            print(f"Erro ao enviar para impressora: {e}")
-            # 3. PLANO B (Fallback):
-            # Se a impressão automática falhar, apenas ABRE o arquivo na tela.
-            # O usuário pode apertar Ctrl+P se quiser.
+            print(f"Erro print: {e}")
             try:
                 os.startfile(filename)
-            except:
-                pass
+            except: pass
 
     # --- LÓGICA DE CHECKOUT ---
 
@@ -231,7 +233,6 @@ class PosPage(ft.Container):
             payload = [{'barcode': i['prod'].barcode, 'quantity': i['qtd']} for i in self.carrinho]
             self.sale_service.create_sale(payload)
             
-            # Verifica se precisa imprimir ANTES de limpar o carrinho
             if self.switch_imprimir.value:
                 self._imprimir_cupom()
             
@@ -245,7 +246,7 @@ class PosPage(ft.Container):
         except Exception as ex:
             self._notificar(f"Erro: {ex}", False)
 
-    # --- LÓGICA DE EDIÇÃO (CORRIGIDA) ---
+    # --- LÓGICA DE EDIÇÃO ---
     def _abrir_modal_editar(self, e):
         index = e.control.data
         item = self.carrinho[index]
@@ -255,7 +256,6 @@ class PosPage(ft.Container):
         self.main_page.update()
 
     def _fechar_modal_edit(self, e):
-        # Esta função fecha especificamente o modal de edição
         self.dialog_edit.open = False
         self.main_page.update()
 
@@ -273,8 +273,6 @@ class PosPage(ft.Container):
 
             self.carrinho[index]['qtd'] = nova_qtd
             self._atualizar_ui_carrinho()
-            
-            # CORREÇÃO DO BUG: Chama explicitamente o fechamento
             self._fechar_modal_edit(None) 
             
         except:
