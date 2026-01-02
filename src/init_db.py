@@ -1,30 +1,36 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event  # <--- 1. ADICIONAR 'event' AQUI
 from src.config.settings import DATABASE_URL
 from src.models.base import Base
 
-# --- IMPORTANTE ---
-# Precisamos importar os modelos aqui, mesmo que não os usemos diretamente.
-# Ao importar, o SQLAlchemy "registra" as classes no sistema.
+# Importar modelos para registrar
 from src.models.product import Product
 from src.models.sale import Sale
-# ------------------
+
+# --- FUNÇÃO DE PROTEÇÃO (WAL MODE) ---
+def configurar_banco_seguro(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")  # Ativa modo contra falhas
+    cursor.execute("PRAGMA synchronous=NORMAL") # Aumenta velocidade
+    cursor.close()
+# -------------------------------------
 
 def init_database():
     """
     Função utilitária para criar as tabelas no banco de dados.
-    Em produção, usaríamos o Alembic (ferramenta de migração), 
-    mas para este MVP, o create_all resolve.
     """
     print(f"🔌 Conectando ao banco em: {DATABASE_URL}")
     
-    # Cria a engine (o motor de conexão)
+    # Cria a engine
     engine = create_engine(DATABASE_URL)
     
+    # --- LIGAR A PROTEÇÃO NA ENGINE ---
+    event.listen(engine, 'connect', configurar_banco_seguro)
+    # ----------------------------------
+    
     print("🏗️  Criando tabelas...")
-    # Este comando olha para todos os modelos que herdam de 'Base' e cria as tabelas
     Base.metadata.create_all(engine)
     
-    print("✅ Banco de dados inicializado com sucesso!")
+    print("✅ Banco de dados inicializado com blindagem WAL!")
 
 if __name__ == "__main__":
     init_database()
