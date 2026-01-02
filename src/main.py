@@ -1,19 +1,17 @@
 # Arquivo: src/main.py
 import sys
 import os
-# --- 🔧 CORREÇÃO DE IMPORTS (O Truque Sênior) ---
-# Isso faz o Python enxergar a pasta raiz 'pypos_system'
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# ------------------------------------------------
 
+# --- 🔧 CORREÇÃO DE IMPORTS ---
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# ------------------------------
 
 import flet as ft
 from sqlalchemy import create_engine, event 
 from sqlalchemy.orm import Session
 from src.config.settings import DATABASE_URL
 
-# ✅ 1. IMPORTANDO AS FERRAMENTAS DE SEGURANÇA (Do arquivo utils.py vizinho)
-# Certifique-se de que utils.py está na mesma pasta src/
+# Importação de Segurança (Utils)
 from utils import configurar_logs, realizar_backup_banco
 
 # Importação dos Serviços
@@ -32,12 +30,11 @@ from src.views.login_view import LoginView
 from src.views.pages.users_page import UsersPage
 
 def main(page: ft.Page):
-    # --- 🛡️ ROTINAS DE SEGURANÇA (PRIMEIRA COISA A RODAR) ---
+    # --- 🛡️ ROTINAS DE SEGURANÇA ---
     print("🛡️ Iniciando protocolos de segurança...")
-    configurar_logs()       # Liga o gravador de erros
-    realizar_backup_banco() # Faz o backup antes de tudo
-    # --------------------------------------------------------
-
+    configurar_logs()
+    realizar_backup_banco()
+    
     # Configuração da Janela
     page.title = "PyPOS | Enterprise"
     page.theme_mode = ft.ThemeMode.LIGHT
@@ -52,26 +49,23 @@ def main(page: ft.Page):
     try:
         engine = create_engine(DATABASE_URL)
 
-        # --- 🛡️ BLINDAGEM DO BANCO (WAL MODE) ---
-        # Protege contra quedas de energia e melhora performance
+        # 🛡️ MODO WAL (Alta Performance e Segurança)
         @event.listens_for(engine, "connect")
         def set_sqlite_pragma(dbapi_connection, connection_record):
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA journal_mode=WAL")
             cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.close()
-        # ----------------------------------------
         
         from src.models.base import Base
-        # Import models para garantir criação das tabelas
+        # Imports forçados para garantir criação das tabelas
         from src.models.product import Product 
         from src.models.sale import Sale
+        from src.models.sale import SaleItem # Adicionado para evitar erro de import
         from src.models.settings import AppSettings
         from src.models.user import User
         
-        # Cria as tabelas se não existirem
         Base.metadata.create_all(engine) 
-
         session = Session(engine)
         
         # Instancia Serviços
@@ -80,20 +74,16 @@ def main(page: ft.Page):
         settings_service = SettingsService(session)
         auth_service = AuthService(session)
         
-        # Garante que existe o usuário admin padrão
         auth_service.initialize_admin()
-        
-        print("✅ Backend inicializado e pronto (Modo Seguro Ativado).")
+        print("✅ Backend inicializado (Modo Seguro Ativado).")
         
     except Exception as e:
         print(f"❌ Erro Crítico de Banco: {e}")
-        # Aqui poderíamos fechar o app ou mostrar alerta
         return
 
     # --- Lógica de Navegação e UI ---
     current_user = None
 
-    # Função Principal do App (Pós-Login)
     def iniciar_app_principal(user):
         nonlocal current_user
         current_user = user
@@ -109,11 +99,15 @@ def main(page: ft.Page):
         settings_page = SettingsPage(page, settings_service)
         users_page = UsersPage(page, auth_service) 
 
-        content_area = ft.Container(content=inventory_page, expand=True)
+        # --- LÓGICA DE TELA INICIAL INTELIGENTE ---
+        # Se for Admin, abre no Dashboard. Se for Operador, abre no Caixa.
+        pagina_inicial = dashboard_page if user.role == 'admin' else pos_page
+        
+        content_area = ft.Container(content=pagina_inicial, expand=True)
 
         def navegar(e):
             page_id = e.control.data
-            # Lógica de troca de abas
+            
             if page_id == "estoque":
                 content_area.content = inventory_page
                 inventory_page.carregar_dados()
@@ -121,6 +115,9 @@ def main(page: ft.Page):
                 content_area.content = pos_page
             elif page_id == "dashboard":
                 content_area.content = dashboard_page
+                # Aqui o dashboard vai atualizar os gráficos e o botão PDF
+                if hasattr(dashboard_page, 'carregar_dados'):
+                    dashboard_page.carregar_dados()
             elif page_id == "historico":
                 content_area.content = history_page
             elif page_id == "config":
@@ -145,7 +142,7 @@ def main(page: ft.Page):
                 data=data_id
             )
 
-        # Informações do Usuário na Sidebar
+        # User Info Sidebar
         user_info = ft.Container(
             content=ft.Row([
                 ft.CircleAvatar(content=ft.Text(user.username[0].upper()), bgcolor=ft.Colors.BLUE_600),
@@ -157,7 +154,6 @@ def main(page: ft.Page):
             padding=10, bgcolor=ft.Colors.WHITE10, border_radius=10
         )
 
-        # Sidebar
         sidebar_items = [
             ft.Row([
                 ft.Icon(ft.Icons.ROCKET_LAUNCH, color=ft.Colors.BLUE_400, size=28),
@@ -179,10 +175,9 @@ def main(page: ft.Page):
             sidebar_items.append(menu_button("Dashboard", ft.Icons.DASHBOARD_OUTLINED, "dashboard"))
             sidebar_items.append(menu_button("Histórico", ft.Icons.HISTORY, "historico"))
             sidebar_items.append(menu_button("Equipe", ft.Icons.PEOPLE, "usuarios"))
-            ft.Divider(color=ft.Colors.WHITE10),
+            sidebar_items.append(ft.Divider(color=ft.Colors.WHITE10))
             sidebar_items.append(menu_button("Configurações", ft.Icons.SETTINGS, "config"))
 
-        # Rodapé
         sidebar_items.append(ft.Container(expand=True))
         sidebar_items.append(menu_button("Sair", ft.Icons.LOGOUT, "logout", is_logout=True))
 
@@ -193,15 +188,16 @@ def main(page: ft.Page):
 
         layout = ft.Row([sidebar, content_area], expand=True, spacing=0)
         page.add(layout)
-        inventory_page.carregar_dados()
+        
+        # Carrega os dados da tela inicial escolhida
+        if hasattr(pagina_inicial, 'carregar_dados'):
+            pagina_inicial.carregar_dados()
 
-    # Função de Login Inicial
     def carregar_login():
         page.bgcolor = "#111827" 
         login_view = LoginView(page, auth_service, on_login_success=iniciar_app_principal)
         page.add(login_view)
 
-    # O APP COMEÇA AQUI
     carregar_login()
 
 if __name__ == "__main__":
