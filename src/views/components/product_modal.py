@@ -6,7 +6,7 @@ class ProductModal:
         self.on_save = on_save_callback
         self.product_id = None 
         
-        # --- Campos Estilizados (Compatível com sua versão) ---
+        # --- Campos Estilizados ---
         self.txt_nome = ft.TextField(
             label="Nome do Produto", 
             prefix_icon=ft.Icons.SHOPPING_BAG_OUTLINED,
@@ -17,7 +17,6 @@ class ProductModal:
             prefix_icon=ft.Icons.QR_CODE,
             border_radius=10
         )
-        # CORREÇÃO: Usando 'prefix' com ft.Text em vez de 'prefix_text'
         self.txt_preco = ft.TextField(
             label="Preço", 
             keyboard_type=ft.KeyboardType.NUMBER, 
@@ -34,12 +33,28 @@ class ProductModal:
             expand=True
         )
 
-        # --- Layout do Conteúdo ---
+        # --- NOVO: Campo de Categoria ---
+        self.dd_categoria = ft.Dropdown(
+            label="Categoria",
+            hint_text="Selecione a categoria",
+            border_radius=10,
+            options=[
+                ft.dropdown.Option("Alimentos"),
+                ft.dropdown.Option("Bebidas"),
+                ft.dropdown.Option("Limpeza"),
+                ft.dropdown.Option("Higiene"),
+                ft.dropdown.Option("Outros"),
+            ],
+            value="Alimentos", # Valor inicial
+        )
+
+        # --- Layout do Conteúdo (Ajustado para incluir categoria) ---
         form_content = ft.Column([
             ft.Text("Dados do Produto", weight="bold", size=16),
             self.txt_nome,
             self.txt_codigo,
             ft.Row([self.txt_preco, self.txt_estoque], spacing=10),
+            self.dd_categoria, # Adicionado aqui
         ], tight=True, width=450)
 
         # --- Dialog ---
@@ -61,7 +76,6 @@ class ProductModal:
             shape=ft.RoundedRectangleBorder(radius=12)
         )
         
-        # Modo Overlay (Obrigatório para funcionar no seu ambiente)
         self.main_page.overlay.append(self.dialog)
 
     def abrir(self, produto=None):
@@ -75,6 +89,8 @@ class ProductModal:
             self.txt_codigo.disabled = True
             self.txt_preco.value = f"{produto.price:.2f}"
             self.txt_estoque.value = str(produto.stock_quantity)
+            # Carrega a categoria do produto (usa "Alimentos" se estiver vazio)
+            self.dd_categoria.value = getattr(produto, 'category', "Alimentos")
         else:
             self.dialog.title.value = "Novo Produto"
             self.txt_nome.value = ""
@@ -82,6 +98,7 @@ class ProductModal:
             self.txt_codigo.disabled = False
             self.txt_preco.value = ""
             self.txt_estoque.value = "0"
+            self.dd_categoria.value = "Alimentos"
             
         self.dialog.open = True
         self.main_page.update()
@@ -91,12 +108,14 @@ class ProductModal:
         self.main_page.update()
 
     def _salvar_click(self, e):
+        # Coleta os dados incluindo a nova Categoria
         dados = {
             "id": self.product_id,
             "name": self.txt_nome.value,
             "barcode": self.txt_codigo.value,
             "price": self.txt_preco.value.replace(",", "."),
-            "stock": self.txt_estoque.value
+            "stock": self.txt_estoque.value,
+            "category": self.dd_categoria.value # NOVO: Enviando categoria
         }
         self.on_save(dados)
         self.fechar()

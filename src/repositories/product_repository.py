@@ -42,15 +42,17 @@ class ProductRepository:
         self.session.execute(stmt)
         self.session.commit()
 
-    def update(self, product_id: int, name: str, price: float, stock: int) -> None:
-        """Atualiza os dados gerais de um produto existente."""
+    # --- MÉTODO AJUSTADO PARA INCLUIR CATEGORIA ---
+    def update(self, product_id: int, name: str, price: float, stock: int, category: str) -> None:
+        """Atualiza os dados gerais de um produto existente, incluindo a categoria."""
         stmt = (
             update(Product)
             .where(Product.id == product_id)
             .values(
                 name=name,
                 price=price,
-                stock_quantity=stock
+                stock_quantity=stock,
+                category=category # <--- AGORA O BANCO VAI SALVAR!
             )
         )
         self.session.execute(stmt)

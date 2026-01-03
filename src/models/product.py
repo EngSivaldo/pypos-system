@@ -19,6 +19,8 @@ class Product(Base):
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     
     stock_quantity: Mapped[int] = mapped_column(Integer, default=0)
+    # Dentro da classe Product no arquivo src/models/product.py
+    category: Mapped[str] = mapped_column(String, default="Geral")
 
     def __repr__(self) -> str:
         return f"<Product(name={self.name}, stock={self.stock_quantity})>"

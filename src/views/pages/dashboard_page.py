@@ -22,10 +22,15 @@ class DashboardPage(ft.Container):
         self.txt_baixo_estoque = ft.Text("0", color="white", size=24, weight="bold")
         self.txt_ticket_medio = ft.Text("R$ 0,00", color="white", size=24, weight="bold")
 
+        # --- NOVO: Inicialização da Lista de Mais Vendidos ---
+        self.lista_mais_vendidos = ft.Column(spacing=5)
+        # -----------------------------------------------------
+
         # --- NOVO BOTÃO DE PDF ---
         self.btn_pdf = ft.ElevatedButton(
             "Baixar Relatório de Vendas (PDF)",
             icon=ft.Icons.PICTURE_AS_PDF,
+            # Usei a forma "blindada" de alinhamento para evitar erros de versão
             style=ft.ButtonStyle(
                 color=ft.Colors.WHITE,
                 bgcolor=ft.Colors.RED_700,
@@ -51,9 +56,26 @@ class DashboardPage(ft.Container):
             
             ft.Divider(color="transparent", height=20),
 
-            # --- ÁREA DE AÇÕES (BOTÃO) ---
-            ft.Text("Relatórios e Ações", size=18, weight="bold", color=ft.Colors.BLUE_GREY_800),
-            ft.Row([self.btn_pdf]),
+            # --- ÁREA DE AÇÕES E RANKING (Ajustado para incluir Mais Vendidos) ---
+            ft.Row([
+                # Coluna do Botão
+                ft.Column([
+                    ft.Text("Relatórios", size=18, weight="bold", color=ft.Colors.BLUE_GREY_800),
+                    self.btn_pdf
+                ], expand=1),
+                
+                # Coluna dos Mais Vendidos
+                ft.Column([
+                    ft.Text("Produtos Mais Vendidos", size=18, weight="bold", color=ft.Colors.BLUE_GREY_800),
+                    ft.Container(
+                        content=self.lista_mais_vendidos,
+                        bgcolor=ft.Colors.WHITE,
+                        padding=15,
+                        border_radius=10,
+                        border=ft.border.all(1, ft.Colors.GREY_200)
+                    )
+                ], expand=1)
+            ], alignment=ft.MainAxisAlignment.START, vertical_alignment=ft.CrossAxisAlignment.START),
             # -----------------------------
             
             ft.Divider(color="transparent", height=20),
@@ -77,14 +99,10 @@ class DashboardPage(ft.Container):
     # --- LÓGICA DO BOTÃO PDF ---
     def gerar_pdf_click(self, e):
         try:
-            # 1. Abre conexão exclusiva para o relatório
             session = SessionLocal()
-            
-            # 2. Gera o arquivo
             caminho_arquivo = generate_sales_report(session)
             session.close()
             
-            # 3. Avisa o usuário (SnackBar)
             self.main_page.snack_bar = ft.SnackBar(
                 content=ft.Text(f"✅ Relatório salvo em: {caminho_arquivo}"),
                 bgcolor=ft.Colors.GREEN_700,
@@ -93,7 +111,6 @@ class DashboardPage(ft.Container):
             self.main_page.snack_bar.open = True
             self.main_page.update()
             
-            # 4. Tenta abrir o arquivo automaticamente
             os.startfile(caminho_arquivo)
             
         except Exception as ex:
@@ -113,13 +130,32 @@ class DashboardPage(ft.Container):
         try:
             stats = self.sale_service.get_dashboard_stats()
             
-            produtos = self.product_service.list_products()
-            # Ajustei aqui: Verifique se no seu model é 'stock' ou 'stock_quantity'
-            # Se der erro, troque por 'stock'
-            low_stock = sum(1 for p in produtos if getattr(p, 'stock', 0) < 10)
+            # --- Atualiza a Lista de Mais Vendidos na UI ---
+            self.lista_mais_vendidos.controls.clear()
+            # Espera que stats['top_produtos'] seja uma lista de (nome, quantidade)
+            top_produtos = stats.get('top_produtos', [])
             
-            self.txt_vendas_hoje.value = f"R$ {stats['vendas_hoje']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            self.txt_ticket_medio.value = f"R$ {stats['ticket_medio']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            if not top_produtos:
+                self.lista_mais_vendidos.controls.append(
+                    ft.Text("Nenhuma venda registrada.", size=12, color=ft.Colors.GREY_500, italic=True)
+                )
+            else:
+                for nome, qtd in top_produtos:
+                    self.lista_mais_vendidos.controls.append(
+                        ft.Row([
+                            ft.Icon(ft.Icons.STAR, color="amber", size=16),
+                            ft.Text(f"{nome}", weight="bold", expand=True, size=14),
+                            ft.Text(f"{qtd} un.", color="blue", weight="bold", size=14),
+                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                    )
+
+            # --- Atualiza os Cards Superiores ---
+            produtos = self.product_service.list_products()
+            # Verificação segura de atributo para estoque
+            low_stock = sum(1 for p in produtos if getattr(p, 'stock_quantity', 0) < 10)
+            
+            self.txt_vendas_hoje.value = f"R$ {stats.get('vendas_hoje', 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            self.txt_ticket_medio.value = f"R$ {stats.get('ticket_medio', 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             self.txt_baixo_estoque.value = str(low_stock)
             
             self.update() 
