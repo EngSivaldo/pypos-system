@@ -9,6 +9,9 @@ class UsersPage(ft.Container):
         self.padding = 20
         self.bgcolor = "#f3f4f6"
 
+        # Variável para controle de exclusão
+        self.usuario_para_deletar = None
+
         # Formulário
         self.txt_nome = ft.TextField(label="Nome Completo", expand=True)
         self.txt_user = ft.TextField(label="Usuário (Login)", expand=True)
@@ -23,10 +26,25 @@ class UsersPage(ft.Container):
             width=200
         )
 
-        self.btn_add = ft.ElevatedButton("Cadastrar Usuário", icon=ft.Icons.PERSON_ADD, on_click=self._adicionar, style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_600, color="white"))
+        self.btn_add = ft.ElevatedButton(
+            "Cadastrar Usuário", 
+            icon=ft.Icons.PERSON_ADD, 
+            on_click=self._adicionar, 
+            style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_600, color="white")
+        )
 
-        # Lista
+        # Lista de usuários
         self.lista_users = ft.Column(spacing=10, scroll=ft.ScrollMode.AUTO)
+
+        # Modal de Confirmação de Exclusão
+        self.dialog_confirm_user = ft.AlertDialog(
+            title=ft.Text("Confirmar Exclusão"),
+            content=ft.Text("Tem certeza que deseja excluir este usuário?"),
+            actions=[
+                ft.TextButton("Cancelar", on_click=lambda _: self._fechar_confirm_user()),
+                ft.ElevatedButton("Sim, Excluir", bgcolor="red", color="white", on_click=self._confirmar_exclusao_usuario)
+            ]
+        )
 
         self.content = ft.Column([
             ft.Text("Gestão de Usuários", size=28, weight="bold", color=ft.Colors.BLUE_GREY_900),
@@ -48,16 +66,28 @@ class UsersPage(ft.Container):
         ], expand=True)
 
     def did_mount(self):
+        # Adiciona o modal ao overlay da página quando ela carregar
+        if self.page and self.dialog_confirm_user not in self.page.overlay:
+            self.page.overlay.append(self.dialog_confirm_user)
         self.carregar_dados()
 
     def carregar_dados(self):
         self.lista_users.controls.clear()
+        # Busca usuários através do auth_service
         users = self.auth_service.list_users()
         
         for u in users:
-            # Não permite deletar o admin principal
-            btn_del = ft.IconButton(ft.Icons.DELETE, ft.Colors.RED, data=u.id, on_click=self._remover)
-            if u.username == "admin": btn_del.visible = False
+            # CORREÇÃO: O botão agora chama _preparar_deletar_usuario (Abre o Modal)
+            btn_del = ft.IconButton(
+                ft.Icons.DELETE, 
+                icon_color=ft.Colors.RED, 
+                data=u.id, 
+                on_click=self._preparar_deletar_usuario 
+            )
+            
+            # Impede deletar o admin principal
+            if u.username == "admin": 
+                btn_del.visible = False
             
             card = ft.Container(
                 content=ft.Row([
@@ -96,11 +126,31 @@ class UsersPage(ft.Container):
             self.main_page.update()
             
         except Exception as ex:
-            print(ex)
+            print(f"Erro ao adicionar: {ex}")
 
-    def _remover(self, e):
-        self.auth_service.delete_user(e.control.data)
-        self.carregar_dados()
-        
-        
-  #Será a tela onde o Admin cadastra a equipe.
+    def _preparar_deletar_usuario(self, e):
+        """Abre o modal e guarda o ID do usuário selecionado"""
+        self.usuario_para_deletar = e.control.data 
+        self.dialog_confirm_user.open = True
+        self.page.update()
+
+    def _fechar_confirm_user(self):
+        """Fecha o modal de confirmação"""
+        self.dialog_confirm_user.open = False
+        self.page.update()
+
+    def _confirmar_exclusao_usuario(self, e):
+        """Executa a exclusão real após o 'Sim' no modal"""
+        try:
+            # CORREÇÃO: Usando auth_service que foi passado no __init__
+            self.auth_service.delete_user(self.usuario_para_deletar)
+            self._fechar_confirm_user()
+            self.carregar_dados() # Atualiza a lista na tela
+            
+            snack = ft.SnackBar(ft.Text("Usuário excluído com sucesso!"), bgcolor="blue")
+            self.main_page.overlay.append(snack)
+            snack.open = True
+            self.main_page.update()
+        except Exception as ex:
+            print(f"Erro ao excluir: {ex}")
+            self._fechar_confirm_user()
